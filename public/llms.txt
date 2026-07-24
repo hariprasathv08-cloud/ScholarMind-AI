@@ -1,0 +1,7 @@
+# StudyGPT AI
+
+> AI-powered learning platform: upload your PDFs, notes, and slides, then chat with them. Answers are grounded in your own materials with page-level citations.
+
+## Pages
+- [Home](/): Landing page and product overview
+- [Sign in](/auth): Sign in or create an account

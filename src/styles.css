@@ -1,0 +1,168 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* StudyGPT AI — a "study room" design system.
+ * Warm off-white light mode, deep ink dark mode, amber highlighter accent.
+ * Instrument Serif for display, Inter for body. Loaded via <link> in __root.tsx. */
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-serif: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  /* Light — warm parchment */
+  --background: oklch(0.985 0.008 85);
+  --foreground: oklch(0.18 0.02 55);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.02 55);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.02 55);
+  --primary: oklch(0.24 0.03 60);
+  --primary-foreground: oklch(0.985 0.008 85);
+  --secondary: oklch(0.95 0.012 80);
+  --secondary-foreground: oklch(0.24 0.03 60);
+  --muted: oklch(0.945 0.014 80);
+  --muted-foreground: oklch(0.5 0.02 70);
+  --accent: oklch(0.94 0.02 78);
+  --accent-foreground: oklch(0.24 0.03 60);
+  --highlight: oklch(0.78 0.17 65); /* amber highlighter */
+  --highlight-foreground: oklch(0.2 0.05 55);
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0.01 85);
+  --border: oklch(0.9 0.015 80);
+  --input: oklch(0.9 0.015 80);
+  --ring: oklch(0.78 0.17 65);
+  --sidebar: oklch(0.975 0.01 85);
+  --sidebar-foreground: oklch(0.24 0.03 60);
+  --sidebar-border: oklch(0.9 0.015 80);
+  --sidebar-accent: oklch(0.93 0.02 78);
+  --sidebar-accent-foreground: oklch(0.24 0.03 60);
+}
+
+.dark {
+  --background: oklch(0.14 0.012 80);
+  --foreground: oklch(0.94 0.015 85);
+  --card: oklch(0.18 0.014 80);
+  --card-foreground: oklch(0.94 0.015 85);
+  --popover: oklch(0.18 0.014 80);
+  --popover-foreground: oklch(0.94 0.015 85);
+  --primary: oklch(0.94 0.015 85);
+  --primary-foreground: oklch(0.18 0.014 80);
+  --secondary: oklch(0.24 0.015 80);
+  --secondary-foreground: oklch(0.94 0.015 85);
+  --muted: oklch(0.22 0.014 80);
+  --muted-foreground: oklch(0.68 0.02 80);
+  --accent: oklch(0.26 0.02 80);
+  --accent-foreground: oklch(0.94 0.015 85);
+  --highlight: oklch(0.8 0.17 68);
+  --highlight-foreground: oklch(0.16 0.03 60);
+  --destructive: oklch(0.62 0.22 27);
+  --destructive-foreground: oklch(0.98 0.01 85);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.8 0.17 68);
+  --sidebar: oklch(0.16 0.012 80);
+  --sidebar-foreground: oklch(0.94 0.015 85);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-accent: oklch(0.24 0.015 80);
+  --sidebar-accent-foreground: oklch(0.94 0.015 85);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html { font-family: var(--font-sans); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+  }
+  .font-serif { font-family: var(--font-serif); letter-spacing: -0.01em; }
+  .grain { background-image: radial-gradient(oklch(0.4 0.05 70 / 0.04) 1px, transparent 1px); background-size: 3px 3px; }
+}
+
+@utility highlight-mark {
+  background: linear-gradient(180deg, transparent 55%, color-mix(in oklch, var(--highlight) 45%, transparent) 55%);
+  padding: 0 0.1em;
+}
+
+/* Markdown body */
+.prose-doc {
+  color: var(--color-foreground);
+  line-height: 1.65;
+}
+.prose-doc h1, .prose-doc h2, .prose-doc h3 {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+  margin-top: 1.25em; margin-bottom: 0.5em;
+}
+.prose-doc h1 { font-size: 1.6rem; }
+.prose-doc h2 { font-size: 1.3rem; }
+.prose-doc h3 { font-size: 1.1rem; }
+.prose-doc p { margin: 0.6em 0; }
+.prose-doc ul, .prose-doc ol { padding-left: 1.4em; margin: 0.6em 0; }
+.prose-doc li { margin: 0.2em 0; }
+.prose-doc code {
+  font-family: var(--font-mono);
+  background: var(--color-muted);
+  padding: 0.15em 0.35em;
+  border-radius: 6px;
+  font-size: 0.88em;
+}
+.prose-doc pre {
+  background: var(--color-muted);
+  padding: 0.9em 1em;
+  border-radius: 10px;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+}
+.prose-doc pre code { background: transparent; padding: 0; }
+.prose-doc blockquote {
+  border-left: 3px solid var(--color-highlight);
+  padding-left: 1em;
+  color: var(--color-muted-foreground);
+  font-style: italic;
+}
+.prose-doc table { border-collapse: collapse; margin: 0.8em 0; }
+.prose-doc th, .prose-doc td { border: 1px solid var(--color-border); padding: 0.4em 0.7em; }
+.prose-doc a { color: var(--color-highlight); text-decoration: underline; text-underline-offset: 3px; }
