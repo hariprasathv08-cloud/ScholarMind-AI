@@ -89,7 +89,10 @@ function cosineSimilarity(a: number[], b: number[]): number {
 // Instantiate SQLite if not using PG
 let sqliteDb: DatabaseSync | null = null;
 if (!usePg) {
-  const dbPath = path.resolve(process.cwd(), "scholarmind.db");
+  const dbPath = process.env.SQLITE_DB_PATH
+    ? path.resolve(process.env.SQLITE_DB_PATH)
+    : path.resolve(process.cwd(), "scholarmind.db");
+  console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
   sqliteDb = new DatabaseSync(dbPath);
   try {
     sqliteDb.exec("PRAGMA foreign_keys = ON;");
