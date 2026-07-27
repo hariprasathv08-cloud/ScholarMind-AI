@@ -6,6 +6,8 @@ services:
     buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
+      - key: NITRO_PRESET
+        value: node-server
       - key: JWT_SECRET
         generateValue: true
       - key: LOVABLE_API_KEY
