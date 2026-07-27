@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { BookOpen, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { Logo } from "@/components/logo";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional(),
@@ -14,8 +15,8 @@ export const Route = createFileRoute("/auth/")({
   validateSearch: searchSchema,
   head: () => ({
     meta: [
-      { title: "Sign in — StudyGPT AI" },
-      { name: "description", content: "Sign in or create your StudyGPT AI account to start chatting with your study materials." },
+      { title: "Sign in — ScholarMind AI" },
+      { name: "description", content: "Sign in or create your ScholarMind AI account to start understanding your study materials." },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -49,7 +50,7 @@ function AuthPage() {
           options: { data: { full_name: name || email.split("@")[0] }, emailRedirectTo: window.location.origin },
         });
         if (error) throw error;
-        toast.success("Welcome to StudyGPT AI!");
+        toast.success("Welcome to ScholarMind AI!");
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
@@ -88,11 +89,9 @@ function AuthPage() {
   return (
     <div className="grid min-h-screen bg-background md:grid-cols-2">
       <aside className="hidden md:flex flex-col justify-between bg-card p-10 border-r border-border">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="grid h-8 w-8 place-items-center rounded-lg bg-foreground text-background">
-            <BookOpen className="h-4 w-4" />
-          </div>
-          <span className="font-serif text-xl">StudyGPT<span className="text-highlight"> AI</span></span>
+        <Link to="/" className="flex items-center gap-3">
+          <Logo variant="mark" className="h-6 w-6" />
+          <span className="font-serif text-xl text-foreground">ScholarMind <span className="text-primary font-bold">AI</span></span>
         </Link>
         <div>
           <h2 className="font-serif text-4xl leading-tight">
@@ -102,7 +101,7 @@ function AuthPage() {
             Upload your notes, slides, and readings. Ask anything — get answers backed by actual pages.
           </p>
         </div>
-        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} StudyGPT AI</p>
+        <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} ScholarMind AI</p>
       </aside>
 
       <main className="flex items-center justify-center px-6 py-12">

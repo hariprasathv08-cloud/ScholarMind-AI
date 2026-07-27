@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireAuth } from "./auth-utils.server";
+import { requireAuth } from "./auth-middleware";
 import { db } from "./db";
 
 export const getDashboardStats = createServerFn({ method: "GET" })

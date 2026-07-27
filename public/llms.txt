@@ -1,6 +1,6 @@
-# StudyGPT AI
+# ScholarMind AI
 
-> AI-powered learning platform: upload your PDFs, notes, and slides, then chat with them. Answers are grounded in your own materials with page-level citations.
+> ScholarMind AI is an AI-powered learning platform that helps students understand PDFs, notes, books, presentations, and study materials through intelligent conversations, summaries, quizzes, flashcards, and AI tutoring.
 
 ## Pages
 - [Home](/): Landing page and product overview

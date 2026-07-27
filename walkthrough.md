@@ -85,3 +85,41 @@ To deploy the application to Render:
    - Add a Persistent Disk to your Web Service in Render.
    - Mount Path: `/uploads` (so that your user documents persist across server restarts).
    - Set environment variable: `UPLOADS_DIR="/uploads"`
+
+---
+
+## 4. Troubleshooting: Model Rate Limits & SQLite Citations Fix
+
+### Gemini API Model Downgrade Fix
+* **Problem**: When using direct Gemini API authentication, the codebase was automatically mapping/downgrading newer models like `gemini-3.5-flash` and `gemini-3.6-flash` to `gemini-2.0-flash`. The `gemini-2.0-flash` model has a `limit: 0` quota constraint on the current API key, which led to infinite `429 Rate Limit` retries and caused the chat to hang indefinitely at *"Searching your document..."*.
+* **Fix**: Modified `cleanModelName` in [`src/lib/ai-gateway.server.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/lib/ai-gateway.server.ts) to:
+  1. Let modern/active models like `gemini-3.5-flash` and `gemini-3.6-flash` pass through as themselves natively.
+  2. Map only older/unsupported models (like `gemini-1.5-flash`, `gemini-2.0-flash`, or `gemini-2.5-flash`) to the standard `gemini-3.5-flash` model.
+* **Result**: Direct Gemini API key authentication works seamlessly, providing real-time streamed responses.
+
+### SQLite JSONB Citations Rendering Fix
+* **Problem**: In local SQLite fallback mode, SQLite returns `JSONB` columns (like `citations` in the `messages` table) as raw JSON text strings rather than parsed JavaScript arrays/objects. When the client loads the message history, React tries to execute `.map()` on the citations string, causing a frontend rendering crash (`TypeError: message.citations.map is not a function`).
+* **Fix**:
+  1. Updated the `listMessages` server function in [`src/lib/chats.functions.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/lib/chats.functions.ts) to intercept the rows and run `JSON.parse` on the `citations` column if it is returned as a string.
+  2. Updated the `MessageBubble` component in [`src/routes/_authenticated/chat.$documentId.tsx`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/routes/_authenticated/chat.$documentId.tsx) to safely verify that `message.citations` is indeed a valid array (`Array.isArray(message.citations)`) before trying to map and render it.
+* **Result**: Chat conversation view loads and renders history and citations successfully without any crashes.
+
+### Dashboard Weekly Activity Chart Layout Fix
+* **Problem**: The "This week" chart was completely empty (blank) because the bar divs inside the flex column had a height defined in percentage (`style={{ height: ...% }}`), but the parent element (`flex-col`) had no explicit height. In CSS, when a parent has an `auto` height that is determined by its children, a child's percentage height collapses to `0`. Additionally, when there was zero activity on a given day, it was rendering a tiny `4%` baseline highlight which looked like constant flatline activity even when no chats existed.
+* **Fix**:
+  1. Updated the layout structure in [`src/routes/_authenticated/dashboard.tsx`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/routes/_authenticated/dashboard.tsx) to give the parent day columns `h-full flex flex-col justify-end items-center gap-2` (which forces them to occupy the full 160px height of the parent chart container).
+  2. Wrapped each bar in a flex-growing container (`relative flex w-full flex-1 items-end`) that occupies all remaining vertical space above the date label, providing a stable, defined height for the child percentage height to resolve against.
+  3. Fixed the date label parsing on the client by parsing the `YYYY-MM-DD` string in local time, preventing any timezone shift issues.
+  4. Updated the height logic to dynamically set `0%` height (completely hiding the bar) when a day's message count is `0`, preventing misleading "baseline" indicators.
+* **Result**: The activity chart renders beautifully and cleanly, displaying dynamic amber bars only for active days (e.g. today, Monday, displays a full-height bar, while other inactive days remain completely empty).
+
+
+### Real-Time Document Deletion & Cascade Fixes
+* **Problem**: Deleting a document from the Library did not update the global sidebar's `RECENT CHATS` list in real time. Additionally, in some SQLite configurations, deleting a document could leave orphaned database rows (e.g. conversations, messages, or chunks) if foreign keys were not explicitly enforced.
+* **Fix**:
+  1. Updated `deleteMut.onSuccess` in [`src/routes/_authenticated/library.tsx`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/routes/_authenticated/library.tsx) to invalidate the `["recent-conversations"]` query cache, forcing the sidebar's recent chats to update instantly when a document is deleted.
+  2. Modified [`src/lib/db.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/lib/db.ts) to explicitly execute `PRAGMA foreign_keys = ON;` upon SQLite database connection initialization.
+* **Result**: Deleting documents instantly cleans up all dependent files and database rows, and updates the sidebar in real time.
+
+
+

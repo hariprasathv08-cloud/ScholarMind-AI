@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireAuth } from "./auth-utils.server";
+import { requireAuth } from "./auth-middleware";
 import { db } from "./db";
 import { z } from "zod";
 import fs from "fs";
@@ -9,6 +9,7 @@ const MAX_BYTES = 25 * 1024 * 1024; // 25 MB
 const ALLOWED = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "text/plain",
   "text/markdown",
 ]);
@@ -89,7 +90,65 @@ export const deleteDocument = createServerFn({ method: "POST" })
   });
 
 /**
- * Parses, chunks, embeds, and stores everything in the local PostgreSQL instance.
+ * Background parsing job for large documents to prevent request timeouts.
+ */
+async function runProcessingInBackground(docId: string, userId: string) {
+  try {
+    const docResult = await db.query(
+      "SELECT id, storage_path, mime_type, title, size_bytes FROM public.documents WHERE id = $1 AND user_id = $2",
+      [docId, userId]
+    );
+    if (docResult.rows.length === 0) throw new Error("Document not found");
+    const doc = docResult.rows[0];
+
+    const fullPath = path.join(process.cwd(), "uploads", doc.storage_path);
+    const buffer = await fs.promises.readFile(fullPath);
+    const bytes = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+
+    const { parseDocument, chunkPages } = await import("./documents.server");
+    const { embed, toVectorLiteral } = await import("./ai-gateway.server");
+
+    console.log(`[Document Processor] Starting background parse for: ${doc.title} (${docId})`);
+    const pages = await parseDocument(bytes, doc.mime_type, doc.title);
+    const chunks = chunkPages(pages);
+    if (chunks.length === 0) throw new Error("No readable text found in the document");
+
+    await db.query("DELETE FROM public.document_chunks WHERE document_id = $1", [doc.id]);
+
+    const BATCH = 512;
+    for (let i = 0; i < chunks.length; i += BATCH) {
+      const slice = chunks.slice(i, i + BATCH);
+      const vectors = await embed(slice.map((c) => c.content));
+      
+      for (let k = 0; k < slice.length; k++) {
+        const c = slice[k];
+        const vecStr = toVectorLiteral(vectors[k]);
+        
+        await db.query(
+          `INSERT INTO public.document_chunks (document_id, user_id, chunk_index, page, content, embedding)
+           VALUES ($1, $2, $3, $4, $5, $6::vector)`,
+          [doc.id, userId, c.index, c.page, c.content, vecStr]
+        );
+      }
+    }
+
+    await db.query(
+      "UPDATE public.documents SET status = $1, page_count = $2, error = $3 WHERE id = $4",
+      ["ready", pages.length, null, doc.id]
+    );
+    console.log(`[Document Processor] Background parse completed for: ${doc.title}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[Document Processor] Background parse failed:", err);
+    await db.query(
+      "UPDATE public.documents SET status = $1, error = $2 WHERE id = $3",
+      ["failed", message, docId]
+    );
+  }
+}
+
+/**
+ * Parses, chunks, embeds, and stores everything in the local PostgreSQL or SQLite instance.
  */
 export const processDocument = createServerFn({ method: "POST" })
   .middleware([requireAuth])
@@ -111,49 +170,13 @@ export const processDocument = createServerFn({ method: "POST" })
       // Update status to processing
       await db.query("UPDATE public.documents SET status = $1, error = $2 WHERE id = $3", ["processing", null, doc.id]);
 
-      // 2. Read local file bytes
-      const fullPath = path.join(process.cwd(), "uploads", doc.storage_path);
-      const buffer = await fs.promises.readFile(fullPath);
-      const bytes = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+      // Fire and forget background parsing job
+      runProcessingInBackground(doc.id, userId);
 
-      const { parseDocument, chunkPages } = await import("./documents.server");
-      const { embed, toVectorLiteral } = await import("./ai-gateway.server");
-
-      const pages = await parseDocument(bytes, doc.mime_type, doc.title);
-      const chunks = chunkPages(pages);
-      if (chunks.length === 0) throw new Error("No readable text found in the document");
-
-      // 3. Delete prior chunks (idempotent re-processing)
-      await db.query("DELETE FROM public.document_chunks WHERE document_id = $1", [doc.id]);
-
-      // 4. Embed chunks in batches of 32
-      const BATCH = 32;
-      for (let i = 0; i < chunks.length; i += BATCH) {
-        const slice = chunks.slice(i, i + BATCH);
-        const vectors = await embed(slice.map((c) => c.content));
-        
-        for (let k = 0; k < slice.length; k++) {
-          const c = slice[k];
-          const vecStr = toVectorLiteral(vectors[k]);
-          
-          await db.query(
-            `INSERT INTO public.document_chunks (document_id, user_id, chunk_index, page, content, embedding)
-             VALUES ($1, $2, $3, $4, $5, $6::vector)`,
-            [doc.id, userId, c.index, c.page, c.content, vecStr]
-          );
-        }
-      }
-
-      // 5. Update document status to ready
-      await db.query(
-        "UPDATE public.documents SET status = $1, page_count = $2, error = $3 WHERE id = $4",
-        ["ready", pages.length, null, doc.id]
-      );
-      
-      return { ok: true, chunks: chunks.length, pages: pages.length };
+      return { ok: true, status: "processing" };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error("[documents.functions] Failed to process document:", err);
+      console.error("[documents.functions] Failed to initiate processDocument:", err);
       
       // Update status to failed
       await db.query(

@@ -6,7 +6,7 @@ import { getDashboardStats } from "@/lib/dashboard.functions";
 import { formatDistanceToNow } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  head: () => ({ meta: [{ title: "Dashboard — StudyGPT AI" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Dashboard — ScholarMind AI" }, { name: "robots", content: "noindex" }] }),
   component: Dashboard,
 });
 
@@ -19,12 +19,12 @@ function Dashboard() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-10 flex items-end justify-between">
+      <header className="mb-10 flex flex-col sm:flex-row sm:items-end justify-between gap-4 sm:gap-0">
         <div>
           <p className="text-sm text-muted-foreground">Welcome back</p>
           <h1 className="mt-1 font-serif text-4xl">Your study room</h1>
         </div>
-        <Link to="/library" className="rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background hover:opacity-90">
+        <Link to="/library" className="w-fit rounded-full bg-foreground px-5 py-2 text-sm font-medium text-background hover:opacity-90">
           <Upload className="mr-2 inline h-4 w-4" />Upload
         </Link>
       </header>
@@ -127,14 +127,19 @@ function ActivityBars({ data }: { data: { date: string; count: number }[] }) {
   return (
     <div className="flex h-40 items-end gap-2">
       {data.map((d) => (
-        <div key={d.date} className="flex flex-1 flex-col items-center gap-2">
-          <div
-            className="w-full rounded-t-md bg-highlight/80"
-            style={{ height: `${Math.max(4, (d.count / max) * 100)}%` }}
-            title={`${d.count} messages`}
-          />
+        <div key={d.date} className="flex h-full flex-1 flex-col justify-end items-center gap-2">
+          <div className="relative flex w-full flex-1 items-end">
+            <div
+              className="w-full rounded-t-md bg-highlight/80"
+              style={{ height: d.count > 0 ? `${Math.max(4, (d.count / max) * 100)}%` : "0%" }}
+              title={`${d.count} messages`}
+            />
+          </div>
           <span className="text-[10px] text-muted-foreground">
-            {new Date(d.date).toLocaleDateString(undefined, { weekday: "short" })}
+            {(() => {
+              const [year, month, day] = d.date.split("-").map(Number);
+              return new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: "short" });
+            })()}
           </span>
         </div>
       ))}

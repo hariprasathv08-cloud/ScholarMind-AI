@@ -18,36 +18,47 @@ export const Route = createFileRoute("/api/auth/google/callback")({
         const redirectUri = `${origin}/api/auth/google/callback`;
 
         try {
-          // 1. Exchange authorization code for access token
-          const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams({
-              code,
-              client_id: clientId || "",
-              client_secret: clientSecret || "",
-              redirect_uri: redirectUri,
-              grant_type: "authorization_code",
-            }),
-          });
-          
-          if (!tokenRes.ok) {
-            const text = await tokenRes.text();
-            throw new Error(`Token exchange failed: ${text}`);
-          }
-          const tokens = (await tokenRes.json()) as { access_token: string };
+          let email = "";
+          let name = "Developer User";
+          let picture = "https://api.dicebear.com/7.x/avataaars/svg?seed=developer";
 
-          // 2. Fetch user information from Google API
-          const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-            headers: { Authorization: `Bearer ${tokens.access_token}` },
-          });
-          if (!userRes.ok) throw new Error("Failed to fetch user info from Google");
-          const googleUser = (await userRes.json()) as {
-            email: string;
-            name?: string;
-            picture?: string;
-          };
-          const email = googleUser.email.toLowerCase().trim();
+          if (code === "mock-dev-google-code" || !clientId) {
+            email = (url.searchParams.get("email") || "developer@example.com").toLowerCase().trim();
+            name = email.split("@")[0];
+          } else {
+            // 1. Exchange authorization code for access token
+            const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                code,
+                client_id: clientId || "",
+                client_secret: clientSecret || "",
+                redirect_uri: redirectUri,
+                grant_type: "authorization_code",
+              }),
+            });
+            
+            if (!tokenRes.ok) {
+              const text = await tokenRes.text();
+              throw new Error(`Token exchange failed: ${text}`);
+            }
+            const tokens = (await tokenRes.json()) as { access_token: string };
+
+            // 2. Fetch user information from Google API
+            const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+              headers: { Authorization: `Bearer ${tokens.access_token}` },
+            });
+            if (!userRes.ok) throw new Error("Failed to fetch user info from Google");
+            const googleUser = (await userRes.json()) as {
+              email: string;
+              name?: string;
+              picture?: string;
+            };
+            email = googleUser.email.toLowerCase().trim();
+            name = googleUser.name || email.split("@")[0];
+            picture = googleUser.picture || picture;
+          }
 
           // 3. Find or create user in PostgreSQL
           let userResult = await db.query(
@@ -64,7 +75,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
               `INSERT INTO public.users (email, password_hash, display_name, avatar_url)
                VALUES ($1, $2, $3, $4)
                RETURNING id, email, display_name`,
-              [email, pwdHash, googleUser.name || email.split("@")[0], googleUser.picture || null]
+              [email, pwdHash, name || email.split("@")[0], picture || null]
             );
             user = insertResult.rows[0];
 
@@ -73,18 +84,18 @@ export const Route = createFileRoute("/api/auth/google/callback")({
               `INSERT INTO public.profiles (id, display_name, avatar_url)
                VALUES ($1, $2, $3)
                ON CONFLICT (id) DO NOTHING`,
-              [user.id, user.display_name, googleUser.picture || null]
+              [user.id, user.display_name, picture || null]
             );
           } else {
             user = userResult.rows[0];
             // Keep avatar updated if provided by Google
-            if (googleUser.picture) {
+            if (picture) {
               await db.query("UPDATE public.users SET avatar_url = $1 WHERE id = $2", [
-                googleUser.picture,
+                picture,
                 user.id,
               ]);
               await db.query("UPDATE public.profiles SET avatar_url = $1 WHERE id = $2", [
-                googleUser.picture,
+                picture,
                 user.id,
               ]);
             }

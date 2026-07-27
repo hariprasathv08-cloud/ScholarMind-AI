@@ -72,17 +72,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "StudyGPT AI — Chat with your PDFs, notes, and slides" },
-      { name: "description", content: "Upload your study materials and ask questions in plain English. StudyGPT AI answers only from your documents, with citations." },
-      { property: "og:title", content: "StudyGPT AI" },
-      { property: "og:description", content: "Chat with your PDFs, notes, and slides. Answers with citations from your own materials." },
+      { title: "ScholarMind AI — Learn Smarter. Understand Faster." },
+      { name: "description", content: "ScholarMind AI is an AI-powered learning platform that helps students understand PDFs, notes, books, presentations, and study materials through intelligent conversations, summaries, quizzes, flashcards, and AI tutoring." },
+      { property: "og:title", content: "ScholarMind AI" },
+      { property: "og:description", content: "ScholarMind AI is an AI-powered learning platform that helps students understand PDFs, notes, books, presentations, and study materials through intelligent conversations, summaries, quizzes, flashcards, and AI tutoring." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "stylesheet", href: katexCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

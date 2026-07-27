@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireAuth } from "./auth-utils.server";
+import { requireAuth } from "./auth-middleware";
 import { db } from "./db";
 import { z } from "zod";
 
@@ -38,7 +38,16 @@ export const listMessages = createServerFn({ method: "GET" })
          ORDER BY created_at ASC`,
         [data.conversationId, userId]
       );
-      return result.rows;
+      return result.rows.map((row) => {
+        if (typeof row.citations === "string") {
+          try {
+            row.citations = JSON.parse(row.citations);
+          } catch {
+            row.citations = null;
+          }
+        }
+        return row;
+      });
     } catch (err) {
       console.error("[chats.functions] Failed to list messages:", err);
       throw new Error("Failed to load message history");

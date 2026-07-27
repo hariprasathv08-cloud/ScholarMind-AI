@@ -1,22 +1,191 @@
 import pg from "pg";
+import { DatabaseSync } from "node:sqlite";
+import path from "node:path";
 
 const { Pool } = pg;
 
 const connectionString = process.env.DATABASE_URL;
+const isLocalPg = !connectionString || connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
 
-if (!connectionString) {
-  console.warn("[Database] WARNING: DATABASE_URL is not set. Database operations will fail.");
+let usePg = false;
+let pgPool: any = null;
+
+if (connectionString && !isLocalPg) {
+  try {
+    pgPool = new Pool({
+      connectionString,
+      ssl: { rejectUnauthorized: false }, // Render PostgreSQL usually requires SSL
+    });
+    usePg = true;
+    console.log("[Database] Using remote PostgreSQL database.");
+  } catch (err) {
+    console.error("[Database] Failed to initialize PostgreSQL pool, falling back to SQLite:", err);
+    usePg = false;
+  }
+} else {
+  console.log("[Database] Using local SQLite database (zero-config).");
 }
 
-export const pool = new Pool({
-  connectionString,
-  ssl: connectionString?.includes("localhost") || connectionString?.includes("127.0.0.1")
-    ? false
-    : { rejectUnauthorized: false }, // Render PostgreSQL usually requires SSL
-});
+export const pool = usePg
+  ? pgPool
+  : ({
+      query: async (text: string, params?: any[]) => db.query(text, params),
+      connect: async () => { throw new Error("PostgreSQL pool is disabled in SQLite fallback mode."); },
+      end: async () => {},
+    } as any);
+
+function translateSql(sql: string): string {
+  let s = sql;
+  // 1. Remove schemas like "public." or "public.tablename"
+  s = s.replace(/\bpublic\./g, "");
+  
+  // 2. Replace NOW() with strftime ISO UTC timestamp
+  s = s.replace(/\bNOW\(\)/gi, "(strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))");
+  
+  // 3. Replace Postgres type casts like "::vector" or "::uuid" or "::text"
+  s = s.replace(/::[a-zA-Z0-9_]+/g, "");
+  
+  // 4. Map parameter placeholders from $1, $2 to ?1, ?2
+  s = s.replace(/\$(\d+)/g, "?$1");
+  
+  // 5. If it's a table creation query, map Postgres types and UUID default
+  if (/CREATE\s+TABLE/i.test(s)) {
+    s = s.replace(
+      /\bUUID\s+PRIMARY\s+KEY\s+DEFAULT\s+gen_random_uuid\(\)/gi,
+      `TEXT PRIMARY KEY DEFAULT (
+        lower(hex(randomblob(4))) || '-' || 
+        lower(hex(randomblob(2))) || '-' || 
+        '4' || substr(lower(hex(randomblob(2))), 2, 3) || '-' || 
+        substr('89ab', abs(random()) % 4 + 1, 1) || substr(lower(hex(randomblob(2))), 2, 3) || '-' || 
+        lower(hex(randomblob(6)))
+      )`
+    );
+    s = s.replace(/\bREFERENCES\s+public\.(\w+)/gi, "REFERENCES $1");
+    s = s.replace(/\bUUID\b/gi, "TEXT");
+    s = s.replace(/\bBIGSERIAL\s+PRIMARY\s+KEY\b/gi, "INTEGER PRIMARY KEY AUTOINCREMENT");
+    s = s.replace(/\bTIMESTAMPTZ\b/gi, "DATETIME");
+    s = s.replace(/\bVARCHAR\(\d+\)/gi, "TEXT");
+    s = s.replace(/\bJSONB\b/gi, "TEXT");
+    s = s.replace(/\bVECTOR\(\d+\)/gi, "TEXT");
+  }
+  
+  return s;
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (!a || !b || a.length !== b.length || a.length === 0) return 0;
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+// Instantiate SQLite if not using PG
+let sqliteDb: DatabaseSync | null = null;
+if (!usePg) {
+  const dbPath = path.resolve(process.cwd(), "scholarmind.db");
+  sqliteDb = new DatabaseSync(dbPath);
+  try {
+    sqliteDb.exec("PRAGMA foreign_keys = ON;");
+  } catch (err) {
+    console.error("[Database] Failed to enable foreign keys in SQLite:", err);
+  }
+}
 
 export const db = {
-  query: (text: string, params?: any[]) => pool.query(text, params),
+  query: async (text: string, params: any[] = []): Promise<{ rows: any[] }> => {
+    if (usePg && pgPool) {
+      return pgPool.query(text, params);
+    }
+    
+    if (!sqliteDb) throw new Error("SQLite DB is not initialized");
+    
+    // Check if it's the vector search query
+    if (text.includes("c.embedding") && text.includes("<=>")) {
+      let queryVec: number[] = [];
+      try {
+        const vecStr = params[0];
+        queryVec = JSON.parse(vecStr);
+      } catch (err) {
+        console.error("[Database] Error parsing query vector:", err);
+      }
+      
+      const docId = params[1];
+      const userId = params[2];
+      const limit = params[3] || 6;
+      
+      // Get all chunks for this doc
+      const sql = `
+        SELECT id, document_id, chunk_index, page, content, embedding
+        FROM document_chunks
+        WHERE document_id = ?1 AND user_id = ?2 AND embedding IS NOT NULL
+      `;
+      const stmt = sqliteDb.prepare(sql);
+      const rows = stmt.all(docId, userId) as any[];
+      
+      // Calculate similarity in JS
+      const scored = rows.map((row) => {
+        let rowVec: number[] = [];
+        try {
+          rowVec = JSON.parse(row.embedding);
+        } catch {
+          if (Array.isArray(row.embedding)) {
+            rowVec = row.embedding;
+          }
+        }
+        const similarity = cosineSimilarity(queryVec, rowVec);
+        return {
+          id: row.id,
+          document_id: row.document_id,
+          chunk_index: row.chunk_index,
+          page: row.page,
+          content: row.content,
+          similarity: similarity,
+        };
+      });
+      
+      // Sort descending by similarity
+      scored.sort((a, b) => b.similarity - a.similarity);
+      return { rows: scored.slice(0, limit) };
+    }
+    
+    // Check if it's an extension creation statement
+    if (text.includes("CREATE EXTENSION")) {
+      return { rows: [] };
+    }
+    
+    const translated = translateSql(text);
+    
+    try {
+      if (/CREATE\s+(TABLE|INDEX)/i.test(translated)) {
+        sqliteDb.exec(translated);
+        return { rows: [] };
+      }
+      
+      const stmt = sqliteDb.prepare(translated);
+      const rows = stmt.all(...params);
+      
+      // Convert to clean standard JS objects
+      const mappedRows = rows.map((row: any) => {
+        const newRow: any = {};
+        for (const key of Object.keys(row)) {
+          newRow[key] = row[key];
+        }
+        return newRow;
+      });
+      
+      return { rows: mappedRows };
+    } catch (err) {
+      console.error(`[Database] SQLite error on query:\n${translated}\nError:`, err);
+      throw err;
+    }
+  }
 };
 
 // Bootstrap function to initialize schema
@@ -107,11 +276,69 @@ export async function initDb() {
       )
     `);
 
-    // 8. Indexes (using standard btree since HNSW can fail if tables are not fully ready or if pgvector syntax varies)
+    // 8. Indexes
     await db.query(`CREATE INDEX IF NOT EXISTS document_chunks_doc_idx ON public.document_chunks(document_id, chunk_index)`);
     await db.query(`CREATE INDEX IF NOT EXISTS conversations_user_updated_idx ON public.conversations(user_id, updated_at DESC)`);
     await db.query(`CREATE INDEX IF NOT EXISTS messages_conv_created_idx ON public.messages(conversation_id, created_at)`);
     await db.query(`CREATE INDEX IF NOT EXISTS documents_user_created_idx ON public.documents(user_id, created_at DESC)`);
+
+    // 9. Quizzes Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS public.quizzes (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        document_id UUID REFERENCES public.documents(id) ON DELETE SET NULL,
+        title TEXT NOT NULL,
+        score INT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // 10. Quiz Questions Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS public.quiz_questions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        quiz_id UUID NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+        question TEXT NOT NULL,
+        options JSONB NOT NULL,
+        correct_option_index INT NOT NULL,
+        user_answer_index INT,
+        explanation TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // 11. Flashcards Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS public.flashcards (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        document_id UUID REFERENCES public.documents(id) ON DELETE SET NULL,
+        front TEXT NOT NULL,
+        back TEXT NOT NULL,
+        box INT NOT NULL DEFAULT 1,
+        next_review TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    // 12. Study Plans Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS public.study_plans (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+        exam_date TEXT NOT NULL,
+        available_hours INT NOT NULL,
+        subjects TEXT NOT NULL,
+        weak_topics TEXT NOT NULL,
+        plan_data JSONB NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      )
+    `);
+
+    await db.query(`CREATE INDEX IF NOT EXISTS quizzes_user_idx ON public.quizzes(user_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS flashcards_user_idx ON public.flashcards(user_id)`);
+    await db.query(`CREATE INDEX IF NOT EXISTS study_plans_user_idx ON public.study_plans(user_id)`);
 
     console.log("[Database] Schema initialized successfully!");
   } catch (error) {
@@ -120,6 +347,6 @@ export async function initDb() {
 }
 
 // Automatically bootstrap database on start
-if (connectionString) {
+if (connectionString || !usePg) {
   initDb();
 }

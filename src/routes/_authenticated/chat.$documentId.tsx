@@ -17,7 +17,7 @@ const searchSchema = z.object({ conversation: z.string().uuid().optional() });
 
 export const Route = createFileRoute("/_authenticated/chat/$documentId")({
   validateSearch: searchSchema,
-  head: () => ({ meta: [{ title: "Chat — StudyGPT AI" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Chat — ScholarMind AI" }, { name: "robots", content: "noindex" }] }),
   component: ChatPage,
 });
 
@@ -111,7 +111,10 @@ function ChatPage() {
           const data = line.slice(5).trim();
           if (!data) continue;
           try {
-            const evt = JSON.parse(data) as { type: string; text?: string; citations?: Citation[] };
+            const evt = JSON.parse(data) as { type: string; text?: string; citations?: Citation[]; message?: string };
+            if (evt.type === "error" && evt.message) {
+              throw new Error(evt.message);
+            }
             if (evt.type === "delta" && evt.text) {
               full += evt.text;
               setMessages((m) => m.map((msg) => msg.id === assistantId ? { ...msg, content: full } : msg));
@@ -119,7 +122,12 @@ function ChatPage() {
               citations = evt.citations;
               setMessages((m) => m.map((msg) => msg.id === assistantId ? { ...msg, citations } : msg));
             }
-          } catch { /* skip */ }
+          } catch (e) {
+            if (e instanceof Error && e.message && !e.message.startsWith("Unexpected token")) {
+              throw e;
+            }
+            /* skip JSON parse/malformed errors */
+          }
         }
       }
     } catch (err) {
@@ -131,7 +139,7 @@ function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-[calc(100vh-56px)] md:h-screen flex-col">
       <header className="flex shrink-0 items-center gap-3 border-b border-border px-6 py-4">
         <Link to="/library" className="text-sm text-muted-foreground hover:text-foreground">← Library</Link>
         <div className="mx-3 h-4 w-px bg-border" />
@@ -183,7 +191,7 @@ function ChatPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder={doc?.status === "ready" ? "Ask a question about this document…" : "Waiting for document to be ready…"}
+            placeholder={doc?.status === "ready" ? "Ask ScholarMind anything about this document…" : "Waiting for document to be ready…"}
             disabled={doc?.status !== "ready" || streaming}
             rows={1}
             className="max-h-40 min-h-[44px] flex-1 resize-none rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-ring disabled:opacity-60"
@@ -197,7 +205,7 @@ function ChatPage() {
           </button>
         </form>
         <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-muted-foreground">
-          Answers are grounded in your document. If it's not in the text, StudyGPT will say so.
+          Answers are grounded in your document. If it's not in the text, ScholarMind will say so.
         </p>
       </div>
     </div>
@@ -221,7 +229,7 @@ function MessageBubble({ message }: { message: Message }) {
           {message.content || "…"}
         </ReactMarkdown>
       </div>
-      {message.citations && message.citations.length > 0 && (
+      {Array.isArray(message.citations) && message.citations.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {message.citations.map((c, i) => (
             <span key={i} className="rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] text-muted-foreground">

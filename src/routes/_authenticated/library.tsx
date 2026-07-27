@@ -7,11 +7,11 @@ import { FileText, Loader2, MoreVertical, Trash2, Upload as UploadIcon, MessageC
 import { formatDistanceToNow } from "date-fns";
 import { listDocuments, deleteDocument, processDocument } from "@/lib/documents.functions";
 
-const ACCEPT = ".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown";
+const ACCEPT = ".pdf,.docx,.pptx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/markdown";
 const MAX_BYTES = 25 * 1024 * 1024;
 
 export const Route = createFileRoute("/_authenticated/library")({
-  head: () => ({ meta: [{ title: "Library — StudyGPT AI" }, { name: "robots", content: "noindex" }] }),
+  head: () => ({ meta: [{ title: "Library — ScholarMind AI" }, { name: "robots", content: "noindex" }] }),
   component: LibraryPage,
 });
 
@@ -38,6 +38,7 @@ function LibraryPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["documents"] });
       qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      qc.invalidateQueries({ queryKey: ["recent-conversations"] });
       toast.success("Document deleted");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Delete failed"),
@@ -138,29 +139,33 @@ function LibraryPage() {
         ) : (
           <ul className="divide-y divide-border">
             {docs.map((d) => (
-              <li key={d.id} className="flex items-center gap-4 px-6 py-4">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent">
-                  <FileText className="h-5 w-5" />
+              <li key={d.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4">
+                <div className="flex items-center gap-4 min-w-0 flex-1">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-accent">
+                    <FileText className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{d.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {(d.size_bytes / 1024).toFixed(0)} KB · {d.page_count ?? "—"} pages ·{" "}
+                      {formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}
+                    </p>
+                    {d.status === "failed" && d.error && <p className="mt-1 text-xs text-destructive text-wrap break-all">Error: {d.error}</p>}
+                  </div>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{d.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {(d.size_bytes / 1024).toFixed(0)} KB · {d.page_count ?? "—"} pages ·{" "}
-                    {formatDistanceToNow(new Date(d.created_at), { addSuffix: true })}
-                  </p>
-                  {d.status === "failed" && d.error && <p className="mt-1 text-xs text-destructive">Error: {d.error}</p>}
+                <div className="flex items-center justify-end gap-3 shrink-0 ml-14 sm:ml-0">
+                  <StatusPill status={d.status} />
+                  {d.status === "ready" && (
+                    <Link
+                      to="/chat/$documentId"
+                      params={{ documentId: d.id }}
+                      className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent"
+                    >
+                      <MessageCircle className="mr-1 inline h-3.5 w-3.5" />Chat
+                    </Link>
+                  )}
+                  <DeleteButton onDelete={() => deleteMut.mutate(d.id)} />
                 </div>
-                <StatusPill status={d.status} />
-                {d.status === "ready" && (
-                  <Link
-                    to="/chat/$documentId"
-                    params={{ documentId: d.id }}
-                    className="rounded-lg border border-border px-3 py-1.5 text-sm hover:bg-accent"
-                  >
-                    <MessageCircle className="mr-1 inline h-3.5 w-3.5" />Chat
-                  </Link>
-                )}
-                <DeleteButton onDelete={() => deleteMut.mutate(d.id)} />
               </li>
             ))}
           </ul>

@@ -113,7 +113,7 @@ export const Route = createFileRoute("/api/chat")({
                 .join("\n\n---\n\n")
             : "(no relevant excerpts found)";
 
-          const systemPrompt = `You are StudyGPT, an AI study partner. Answer the user's question using ONLY the excerpts below from the document "${doc.title}".
+          const systemPrompt = `You are ScholarMind AI, a friendly, professional, educational, patient, and concise AI learning companion. Answer the user's question using ONLY the excerpts below from the document "${doc.title}".
 
 STRICT RULES:
 - If the answer is not in the excerpts, reply exactly: "I couldn't find this information in your uploaded documents."
@@ -173,7 +173,10 @@ ${contextBlock}`;
                   } catch { /* ignore titling errors */ }
                 }
               } catch (err) {
-                const msg = err instanceof Error ? err.message : "Stream error";
+                let msg = err instanceof Error ? err.message : "Stream error";
+                if (msg.includes("429") || msg.toLowerCase().includes("quota") || msg.toLowerCase().includes("limit") || msg.toLowerCase().includes("exhausted")) {
+                  msg = "ScholarMind AI is experiencing high traffic. Please wait a few seconds and try again.";
+                }
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "error", message: msg })}\n\n`));
                 controller.close();
               }

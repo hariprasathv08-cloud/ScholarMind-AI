@@ -4,8 +4,8 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* StudyGPT AI — a "study room" design system.
- * Warm off-white light mode, deep ink dark mode, amber highlighter accent.
+/* ScholarMind AI — a premium learning platform design system.
+ * Deep dark mode, royal purple primary, amber highlighter accent.
  * Instrument Serif for display, Inter for body. Loaded via <link> in __root.tsx. */
 
 @theme inline {
@@ -50,62 +50,62 @@
 :root {
   --radius: 0.75rem;
 
-  /* Light — warm parchment */
-  --background: oklch(0.985 0.008 85);
-  --foreground: oklch(0.18 0.02 55);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 55);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 55);
-  --primary: oklch(0.24 0.03 60);
-  --primary-foreground: oklch(0.985 0.008 85);
-  --secondary: oklch(0.95 0.012 80);
-  --secondary-foreground: oklch(0.24 0.03 60);
-  --muted: oklch(0.945 0.014 80);
-  --muted-foreground: oklch(0.5 0.02 70);
-  --accent: oklch(0.94 0.02 78);
-  --accent-foreground: oklch(0.24 0.03 60);
-  --highlight: oklch(0.78 0.17 65); /* amber highlighter */
-  --highlight-foreground: oklch(0.2 0.05 55);
-  --destructive: oklch(0.58 0.22 27);
-  --destructive-foreground: oklch(0.99 0.01 85);
-  --border: oklch(0.9 0.015 80);
-  --input: oklch(0.9 0.015 80);
-  --ring: oklch(0.78 0.17 65);
-  --sidebar: oklch(0.975 0.01 85);
-  --sidebar-foreground: oklch(0.24 0.03 60);
-  --sidebar-border: oklch(0.9 0.015 80);
-  --sidebar-accent: oklch(0.93 0.02 78);
-  --sidebar-accent-foreground: oklch(0.24 0.03 60);
+  /* Fallback values */
+  --background: #0F0F12;
+  --foreground: #F3F4F6;
+  --card: #17171C;
+  --card-foreground: #F3F4F6;
+  --popover: #17171C;
+  --popover-foreground: #F3F4F6;
+  --primary: #6D28D9;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1F2937;
+  --secondary-foreground: #F3F4F6;
+  --muted: #1E1E24;
+  --muted-foreground: #9CA3AF;
+  --accent: #1F2937;
+  --accent-foreground: #F3F4F6;
+  --highlight: #F59E0B;
+  --highlight-foreground: #0F0F12;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #2B2B35;
+  --input: #2B2B35;
+  --ring: #6D28D9;
+  --sidebar: #111115;
+  --sidebar-foreground: #9CA3AF;
+  --sidebar-border: #2B2B35;
+  --sidebar-accent: #1E1E24;
+  --sidebar-accent-foreground: #F3F4F6;
 }
 
 .dark {
-  --background: oklch(0.14 0.012 80);
-  --foreground: oklch(0.94 0.015 85);
-  --card: oklch(0.18 0.014 80);
-  --card-foreground: oklch(0.94 0.015 85);
-  --popover: oklch(0.18 0.014 80);
-  --popover-foreground: oklch(0.94 0.015 85);
-  --primary: oklch(0.94 0.015 85);
-  --primary-foreground: oklch(0.18 0.014 80);
-  --secondary: oklch(0.24 0.015 80);
-  --secondary-foreground: oklch(0.94 0.015 85);
-  --muted: oklch(0.22 0.014 80);
-  --muted-foreground: oklch(0.68 0.02 80);
-  --accent: oklch(0.26 0.02 80);
-  --accent-foreground: oklch(0.94 0.015 85);
-  --highlight: oklch(0.8 0.17 68);
-  --highlight-foreground: oklch(0.16 0.03 60);
-  --destructive: oklch(0.62 0.22 27);
-  --destructive-foreground: oklch(0.98 0.01 85);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.8 0.17 68);
-  --sidebar: oklch(0.16 0.012 80);
-  --sidebar-foreground: oklch(0.94 0.015 85);
-  --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-accent: oklch(0.24 0.015 80);
-  --sidebar-accent-foreground: oklch(0.94 0.015 85);
+  --background: #0F0F12;
+  --foreground: #F3F4F6;
+  --card: #17171C;
+  --card-foreground: #F3F4F6;
+  --popover: #17171C;
+  --popover-foreground: #F3F4F6;
+  --primary: #6D28D9;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1F2937;
+  --secondary-foreground: #F3F4F6;
+  --muted: #1E1E24;
+  --muted-foreground: #9CA3AF;
+  --accent: #1F2937;
+  --accent-foreground: #F3F4F6;
+  --highlight: #F59E0B;
+  --highlight-foreground: #0F0F12;
+  --destructive: #EF4444;
+  --destructive-foreground: #FFFFFF;
+  --border: #2B2B35;
+  --input: #2B2B35;
+  --ring: #6D28D9;
+  --sidebar: #111115;
+  --sidebar-foreground: #9CA3AF;
+  --sidebar-border: #2B2B35;
+  --sidebar-accent: #1E1E24;
+  --sidebar-accent-foreground: #F3F4F6;
 }
 
 @layer base {
