@@ -3,7 +3,7 @@ services:
     name: scholarmind-ai
     runtime: node
     plan: free
-    buildCommand: npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm run start
     envVars:
       - key: JWT_SECRET
