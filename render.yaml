@@ -5,8 +5,6 @@ services:
     buildCommand: npm run build
     startCommand: npm run start
     envVars:
-      - key: SQLITE_DB_PATH
-        value: /uploads/scholarmind.db
       - key: JWT_SECRET
         generateValue: true
       - key: LOVABLE_API_KEY
@@ -17,9 +15,5 @@ services:
         sync: false
       - key: GOOGLE_CLIENT_SECRET
         sync: false
-      - key: UPLOADS_DIR
-        value: /uploads
-    disk:
-      name: scholarmind-uploads
-      mountPath: /uploads
-      sizeGB: 1
+      - key: DATABASE_URL
+        sync: false
