@@ -17,9 +17,10 @@ export const Route = createFileRoute("/api/auth/google")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const clientId = process.env.GOOGLE_CLIENT_ID;
-        if (!clientId) {
-          const html = `<!DOCTYPE html>
+        try {
+          const clientId = process.env.GOOGLE_CLIENT_ID;
+          if (!clientId) {
+            const html = `<!DOCTYPE html>
 <html>
 <head>
   <title>Google Authentication Bypass (Developer Mode)</title>
@@ -121,22 +122,32 @@ export const Route = createFileRoute("/api/auth/google")({
   </div>
 </body>
 </html>`;
-          return new Response(html, {
-            headers: { "Content-Type": "text/html; charset=utf-8" },
+            return new Response(html, {
+              headers: { "Content-Type": "text/html; charset=utf-8" },
+            });
+          }
+          
+          const origin = getRequestOrigin(request);
+          const redirectUri = `${origin}/api/auth/google/callback`;
+          const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
+            redirectUri
+          )}&response_type=code&scope=${encodeURIComponent("email profile")}`;
+
+          return new Response(null, {
+            status: 302,
+            headers: { Location: url },
+          });
+        } catch (e) {
+          console.error("ERROR IN GOOGLE GET HANDLER:", e);
+          const errMessage = e instanceof Error ? e.message : String(e);
+          const errStack = e instanceof Error ? e.stack : "";
+          return new Response(JSON.stringify({ error: errMessage, stack: errStack }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
           });
         }
-        
-        const origin = getRequestOrigin(request);
-        const redirectUri = `${origin}/api/auth/google/callback`;
-        const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
-          redirectUri
-        )}&response_type=code&scope=${encodeURIComponent("email profile")}`;
-
-        return new Response(null, {
-          status: 302,
-          headers: { Location: url },
-        });
       },
     },
   },
+  component: () => null,
 });

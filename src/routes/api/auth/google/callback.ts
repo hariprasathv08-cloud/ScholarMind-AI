@@ -19,18 +19,18 @@ export const Route = createFileRoute("/api/auth/google/callback")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const url = new URL(request.url);
-        const code = url.searchParams.get("code");
-        if (!code) {
-          return new Response("Missing authorization code", { status: 400 });
-        }
-
-        const clientId = process.env.GOOGLE_CLIENT_ID;
-        const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-        const origin = getRequestOrigin(request);
-        const redirectUri = `${origin}/api/auth/google/callback`;
-
         try {
+          const url = new URL(request.url);
+          const code = url.searchParams.get("code");
+          if (!code) {
+            return new Response("Missing authorization code", { status: 400 });
+          }
+
+          const clientId = process.env.GOOGLE_CLIENT_ID;
+          const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+          const origin = getRequestOrigin(request);
+          const redirectUri = `${origin}/api/auth/google/callback`;
+
           let email = "";
           let name = "Developer User";
           let picture = "https://api.dicebear.com/7.x/avataaars/svg?seed=developer";
@@ -126,12 +126,15 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           });
         } catch (e) {
           console.error("[Google OAuth Callback] Error:", e);
-          return new Response(
-            `Google authentication failed: ${e instanceof Error ? e.message : String(e)}`,
-            { status: 500 }
-          );
+          const errMessage = e instanceof Error ? e.message : String(e);
+          const errStack = e instanceof Error ? e.stack : "";
+          return new Response(JSON.stringify({ error: `Google authentication failed: ${errMessage}`, stack: errStack }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
         }
       },
     },
   },
+  component: () => null,
 });
