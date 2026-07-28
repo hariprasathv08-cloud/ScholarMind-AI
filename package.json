@@ -2,6 +2,9 @@
   "name": "scholarmind-ai",
   "description": "ScholarMind AI is an AI-powered learning platform that helps students understand PDFs, notes, books, presentations, and study materials through intelligent conversations, summaries, quizzes, flashcards, and AI tutoring.",
   "private": true,
+  "engines": {
+    "node": ">=22.5.0"
+  },
   "sideEffects": false,
   "type": "module",
   "scripts": {
