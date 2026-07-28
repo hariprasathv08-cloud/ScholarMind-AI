@@ -115,7 +115,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
           }
 
           // 4. Generate JWT session token and redirect back to Dashboard
-          const token = signToken({ userId: user.id, email: user.email });
+          const token = await signToken({ userId: user.id, email: user.email });
           
           return new Response(null, {
             status: 302,

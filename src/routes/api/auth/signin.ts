@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/auth/signin")({
           }
 
           // 3. Issue token and set cookie
-          const token = signToken({ userId: user.id, email: user.email });
+          const token = await signToken({ userId: user.id, email: user.email });
 
           return new Response(
             JSON.stringify({

@@ -36,7 +36,7 @@ export const requireAuth = createMiddleware({ type: "function" }).server(
 
     // Dynamically import server-side verification to avoid bundling Node libraries on the client
     const { verifyToken } = await import("./auth-utils.server");
-    const payload = verifyToken(token);
+    const payload = await verifyToken(token);
     if (!payload) {
       throw new Error("Unauthorized: Invalid or expired session token");
     }

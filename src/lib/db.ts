@@ -1,9 +1,3 @@
-import pg from "pg";
-import { DatabaseSync } from "node:sqlite";
-import path from "node:path";
-
-const { Pool } = pg;
-
 const connectionString = process.env.DATABASE_URL;
 const isLocalPg = !connectionString || connectionString.includes("localhost") || connectionString.includes("127.0.0.1");
 
@@ -11,28 +5,33 @@ let usePg = false;
 let pgPool: any = null;
 let sqliteDb: any = null;
 
-if (connectionString && !isLocalPg) {
-  try {
-    pgPool = new Pool({
-      connectionString,
-      ssl: { rejectUnauthorized: false }, // Render PostgreSQL usually requires SSL
-      connectionTimeoutMillis: 3000,      // Fail fast (3 seconds) if database is unreachable
-    });
-    console.log("[Database] Remote PostgreSQL pool initialized. Connection check pending...");
-  } catch (err) {
-    console.error("[Database] Failed to initialize PostgreSQL pool:", err);
+async function getPgPool() {
+  if (pgPool) return pgPool;
+  if (connectionString && !isLocalPg) {
+    try {
+      const pg = await import("pg").then(m => m.default || m);
+      pgPool = new pg.Pool({
+        connectionString,
+        ssl: { rejectUnauthorized: false }, // Render PostgreSQL usually requires SSL
+        connectionTimeoutMillis: 3000,      // Fail fast (3 seconds) if database is unreachable
+      });
+      console.log("[Database] Remote PostgreSQL pool initialized.");
+    } catch (err) {
+      console.error("[Database] Failed to initialize PostgreSQL pool:", err);
+    }
   }
-} else {
-  console.log("[Database] Local SQLite database selected (zero-config).");
+  return pgPool;
 }
 
-function initSQLite() {
+async function initSQLite() {
   if (sqliteDb) return;
-  const dbPath = process.env.SQLITE_DB_PATH
-    ? path.resolve(process.env.SQLITE_DB_PATH)
-    : path.resolve(process.cwd(), "scholarmind.db");
-  console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
   try {
+    const path = await import("node:path").then(m => m.default || m);
+    const dbPath = process.env.SQLITE_DB_PATH
+      ? path.resolve(process.env.SQLITE_DB_PATH)
+      : path.resolve(process.cwd(), "scholarmind.db");
+    console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
+    const { DatabaseSync } = await import("node:sqlite");
     sqliteDb = new DatabaseSync(dbPath);
     sqliteDb.exec("PRAGMA foreign_keys = ON;");
   } catch (err) {
@@ -42,20 +41,23 @@ function initSQLite() {
 
 export const pool = {
   query: async (text: string, params?: any[]) => {
-    if (usePg && pgPool) {
-      return pgPool.query(text, params);
+    if (usePg) {
+      const pool = await getPgPool();
+      if (pool) return pool.query(text, params);
     }
     return db.query(text, params);
   },
   connect: async () => {
-    if (usePg && pgPool) {
-      return pgPool.connect();
+    const pool = await getPgPool();
+    if (usePg && pool) {
+      return pool.connect();
     }
     throw new Error("PostgreSQL pool is disabled in SQLite fallback mode.");
   },
   end: async () => {
-    if (pgPool) {
-      await pgPool.end().catch(() => {});
+    const pool = await getPgPool();
+    if (pool) {
+      await pool.end().catch(() => {});
     }
   },
 } as any;
@@ -115,10 +117,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
 let initPromise: Promise<void> | null = null;
 
 async function checkConnection() {
-  if (pgPool) {
+  const pool = await getPgPool();
+  if (pool) {
     try {
       console.log("[Database] Testing connection to remote PostgreSQL...");
-      const client = await pgPool.connect();
+      const client = await pool.connect();
       client.release();
       usePg = true;
       console.log("[Database] Successfully connected to remote PostgreSQL. Using remote database.");
@@ -133,7 +136,7 @@ async function checkConnection() {
   }
 
   if (!usePg) {
-    initSQLite();
+    await initSQLite();
   }
 }
 
@@ -144,12 +147,13 @@ export const db = {
     }
     await initPromise;
 
-    if (usePg && pgPool) {
-      return pgPool.query(text, params);
+    if (usePg) {
+      const pool = await getPgPool();
+      if (pool) return pool.query(text, params);
     }
     
     if (!sqliteDb) {
-      initSQLite();
+      await initSQLite();
     }
     if (!sqliteDb) throw new Error("SQLite DB is not initialized");
     
@@ -406,5 +410,5 @@ export async function initDb() {
   }
 }
 
-// Automatically bootstrap database on start
-initDb();
+// Automatically bootstrap database on start (triggered lazily on first query)
+

@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/chat")({
 
         if (!token) return new Response("Unauthorized", { status: 401 });
 
-        const payloadToken = verifyToken(token);
+        const payloadToken = await verifyToken(token);
         if (!payloadToken) return new Response("Unauthorized", { status: 401 });
         const userId = payloadToken.userId;
 

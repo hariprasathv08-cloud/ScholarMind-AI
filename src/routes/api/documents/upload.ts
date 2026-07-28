@@ -29,7 +29,7 @@ export const Route = createFileRoute("/api/documents/upload")({
 
         if (!token) return new Response("Unauthorized", { status: 401 });
 
-        const payload = verifyToken(token);
+        const payload = await verifyToken(token);
         if (!payload) return new Response("Unauthorized", { status: 401 });
         const userId = payload.userId;
 

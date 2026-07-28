@@ -35,7 +35,7 @@ export const Route = createFileRoute("/api/auth/me")({
           });
         }
 
-        const payload = verifyToken(token);
+        const payload = await verifyToken(token);
         if (!payload) {
           return new Response(JSON.stringify({ user: null }), {
             status: 200,
