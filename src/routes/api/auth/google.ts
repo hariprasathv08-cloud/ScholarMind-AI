@@ -18,7 +18,7 @@ export const Route = createFileRoute("/api/auth/google")({
     handlers: {
       GET: async ({ request }) => {
         try {
-          const clientId = process.env.GOOGLE_CLIENT_ID;
+          const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
           if (!clientId) {
             const html = `<!DOCTYPE html>
 <html>

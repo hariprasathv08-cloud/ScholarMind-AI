@@ -26,8 +26,8 @@ export const Route = createFileRoute("/api/auth/google/callback")({
             return new Response("Missing authorization code", { status: 400 });
           }
 
-          const clientId = process.env.GOOGLE_CLIENT_ID;
-          const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+          const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+          const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
           const origin = getRequestOrigin(request);
           const redirectUri = `${origin}/api/auth/google/callback`;
 
