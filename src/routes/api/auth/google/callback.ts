@@ -2,6 +2,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { db } from "@/lib/db";
 import { signToken } from "@/lib/auth-utils.server";
 
+function getRequestOrigin(request: Request): string {
+  const xForwardedProto = request.headers.get("x-forwarded-proto") || "http";
+  const xForwardedHost = request.headers.get("x-forwarded-host");
+  if (xForwardedHost) {
+    return `${xForwardedProto}://${xForwardedHost}`;
+  }
+  const host = request.headers.get("host");
+  if (host) {
+    return `${xForwardedProto}://${host}`;
+  }
+  return new URL(request.url).origin;
+}
+
 export const Route = createFileRoute("/api/auth/google/callback")({
   server: {
     handlers: {
@@ -14,7 +27,7 @@ export const Route = createFileRoute("/api/auth/google/callback")({
 
         const clientId = process.env.GOOGLE_CLIENT_ID;
         const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-        const origin = url.origin;
+        const origin = getRequestOrigin(request);
         const redirectUri = `${origin}/api/auth/google/callback`;
 
         try {

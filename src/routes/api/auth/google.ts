@@ -1,5 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+function getRequestOrigin(request: Request): string {
+  const xForwardedProto = request.headers.get("x-forwarded-proto") || "http";
+  const xForwardedHost = request.headers.get("x-forwarded-host");
+  if (xForwardedHost) {
+    return `${xForwardedProto}://${xForwardedHost}`;
+  }
+  const host = request.headers.get("host");
+  if (host) {
+    return `${xForwardedProto}://${host}`;
+  }
+  return new URL(request.url).origin;
+}
+
 export const Route = createFileRoute("/api/auth/google")({
   server: {
     handlers: {
@@ -113,7 +126,7 @@ export const Route = createFileRoute("/api/auth/google")({
           });
         }
         
-        const origin = new URL(request.url).origin;
+        const origin = getRequestOrigin(request);
         const redirectUri = `${origin}/api/auth/google/callback`;
         const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(
           redirectUri

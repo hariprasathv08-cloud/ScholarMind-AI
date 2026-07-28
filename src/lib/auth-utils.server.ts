@@ -22,3 +22,8 @@ export function verifyToken(token: string): { userId: string; email: string } | 
     return null;
   }
 }
+
+export function getSessionCookieHeader(token: string): string {
+  const isProd = process.env.NODE_ENV === "production" || !!process.env.NITRO_PRESET;
+  return `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800${isProd ? "; Secure" : ""}`;
+}

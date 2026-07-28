@@ -9,30 +9,56 @@ const isLocalPg = !connectionString || connectionString.includes("localhost") ||
 
 let usePg = false;
 let pgPool: any = null;
+let sqliteDb: any = null;
 
 if (connectionString && !isLocalPg) {
   try {
     pgPool = new Pool({
       connectionString,
       ssl: { rejectUnauthorized: false }, // Render PostgreSQL usually requires SSL
+      connectionTimeoutMillis: 3000,      // Fail fast (3 seconds) if database is unreachable
     });
-    usePg = true;
-    console.log("[Database] Using remote PostgreSQL database.");
+    console.log("[Database] Remote PostgreSQL pool initialized. Connection check pending...");
   } catch (err) {
-    console.error("[Database] Failed to initialize PostgreSQL pool, falling back to SQLite:", err);
-    usePg = false;
+    console.error("[Database] Failed to initialize PostgreSQL pool:", err);
   }
 } else {
-  console.log("[Database] Using local SQLite database (zero-config).");
+  console.log("[Database] Local SQLite database selected (zero-config).");
 }
 
-export const pool = usePg
-  ? pgPool
-  : ({
-      query: async (text: string, params?: any[]) => db.query(text, params),
-      connect: async () => { throw new Error("PostgreSQL pool is disabled in SQLite fallback mode."); },
-      end: async () => {},
-    } as any);
+function initSQLite() {
+  if (sqliteDb) return;
+  const dbPath = process.env.SQLITE_DB_PATH
+    ? path.resolve(process.env.SQLITE_DB_PATH)
+    : path.resolve(process.cwd(), "scholarmind.db");
+  console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
+  try {
+    sqliteDb = new DatabaseSync(dbPath);
+    sqliteDb.exec("PRAGMA foreign_keys = ON;");
+  } catch (err) {
+    console.error("[Database] Failed to initialize SQLite database:", err);
+  }
+}
+
+export const pool = {
+  query: async (text: string, params?: any[]) => {
+    if (usePg && pgPool) {
+      return pgPool.query(text, params);
+    }
+    return db.query(text, params);
+  },
+  connect: async () => {
+    if (usePg && pgPool) {
+      return pgPool.connect();
+    }
+    throw new Error("PostgreSQL pool is disabled in SQLite fallback mode.");
+  },
+  end: async () => {
+    if (pgPool) {
+      await pgPool.end().catch(() => {});
+    }
+  },
+} as any;
 
 function translateSql(sql: string): string {
   let s = sql;
@@ -86,27 +112,45 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// Instantiate SQLite if not using PG
-let sqliteDb: DatabaseSync | null = null;
-if (!usePg) {
-  const dbPath = process.env.SQLITE_DB_PATH
-    ? path.resolve(process.env.SQLITE_DB_PATH)
-    : path.resolve(process.cwd(), "scholarmind.db");
-  console.log(`[Database] Connecting to SQLite database at: ${dbPath}`);
-  sqliteDb = new DatabaseSync(dbPath);
-  try {
-    sqliteDb.exec("PRAGMA foreign_keys = ON;");
-  } catch (err) {
-    console.error("[Database] Failed to enable foreign keys in SQLite:", err);
+let initPromise: Promise<void> | null = null;
+
+async function checkConnection() {
+  if (pgPool) {
+    try {
+      console.log("[Database] Testing connection to remote PostgreSQL...");
+      const client = await pgPool.connect();
+      client.release();
+      usePg = true;
+      console.log("[Database] Successfully connected to remote PostgreSQL. Using remote database.");
+    } catch (err) {
+      console.error("[Database] Failed to connect to PostgreSQL, falling back to SQLite:", err);
+      usePg = false;
+      if (pgPool) {
+        await pgPool.end().catch(() => {});
+        pgPool = null;
+      }
+    }
+  }
+
+  if (!usePg) {
+    initSQLite();
   }
 }
 
 export const db = {
   query: async (text: string, params: any[] = []): Promise<{ rows: any[] }> => {
+    if (!initPromise) {
+      initDb();
+    }
+    await initPromise;
+
     if (usePg && pgPool) {
       return pgPool.query(text, params);
     }
     
+    if (!sqliteDb) {
+      initSQLite();
+    }
     if (!sqliteDb) throw new Error("SQLite DB is not initialized");
     
     // Check if it's the vector search query
@@ -193,11 +237,24 @@ export const db = {
 
 // Bootstrap function to initialize schema
 export async function initDb() {
+  if (initPromise) return initPromise;
+  
+  initPromise = checkConnection();
+  await initPromise;
+
   console.log("[Database] Initializing schema...");
   try {
-    // 1. Enable extensions
-    await db.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
-    await db.query(`CREATE EXTENSION IF NOT EXISTS vector`);
+    // 1. Enable extensions (safely ignore errors if extensions exist but user lacks superuser permissions)
+    try {
+      await db.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+    } catch (extErr) {
+      console.warn("[Database] Warning: Could not run CREATE EXTENSION uuid-ossp (might already exist):", extErr);
+    }
+    try {
+      await db.query(`CREATE EXTENSION IF NOT EXISTS vector`);
+    } catch (extErr) {
+      console.warn("[Database] Warning: Could not run CREATE EXTENSION vector (might already exist):", extErr);
+    }
 
     // 2. Users Table
     await db.query(`
@@ -350,6 +407,4 @@ export async function initDb() {
 }
 
 // Automatically bootstrap database on start
-if (connectionString || !usePg) {
-  initDb();
-}
+initDb();

@@ -121,5 +121,25 @@ To deploy the application to Render:
   2. Modified [`src/lib/db.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/lib/db.ts) to explicitly execute `PRAGMA foreign_keys = ON;` upon SQLite database connection initialization.
 * **Result**: Deleting documents instantly cleans up all dependent files and database rows, and updates the sidebar in real time.
 
+---
+
+## 4. Google Login and Startup Database Fixes (Render Hosting & Local)
+
+### Database Timeout & Startup Fallback
+* **Problem**: If `DATABASE_URL` is defined but PostgreSQL is unreachable (e.g. database paused, firewall block, or DNS resolution failure), the server initialization query (`CREATE EXTENSION`) timed out after a long block, completely crashing the application startup or causing subsequent requests to fail with a `500` route load error ("This page didn't load").
+* **Fix**: 
+  1. Configured the PostgreSQL pool with a `connectionTimeoutMillis: 3000` (3 seconds) limit.
+  2. Wrapped startup database verification in a dynamic connection check. If PostgreSQL fails to connect within 3 seconds, it outputs the error and seamlessly falls back to the zero-config local SQLite database (`scholarmind.db`).
+  3. Added sub-try/catch blocks around database extension queries (`CREATE EXTENSION IF NOT EXISTS`) so schema initialization doesn't abort if a cloud provider's permissions prevent superuser commands but the tables/extensions already exist.
+* **Result**: The application starts up instantly and works correctly on SQLite when PostgreSQL is unreachable or not yet configured.
+
+### Google Login Redirect URI Mismatch behind Reverse Proxies (Render)
+* **Problem**: On Render, the application runs behind a reverse proxy forwarding requests to an internal port (e.g., `localhost:10000`). Standard `new URL(request.url)` on the server resolves the origin to the internal host (`http://localhost:10000`), which causes Google OAuth to reject the login request (due to redirect URI mismatch) or redirects the user to the unreachable internal port in their browser.
+* **Fix**:
+  1. Created a `getRequestOrigin` utility that checks `x-forwarded-host` and `x-forwarded-proto` headers before falling back to the standard URL host.
+  2. Updated the origin construction in [`google.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/routes/api/auth/google.ts) and [`callback.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/routes/api/auth/google/callback.ts) to use this utility.
+* **Result**: Google login automatically detects the public domain name (e.g. `https://scholarmind-ai.onrender.com`) and redirects seamlessly without any OAuth configuration mismatch.
+
+
 
 

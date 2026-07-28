@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { comparePassword, signToken } from "@/lib/auth-utils.server";
+import { comparePassword, signToken, getSessionCookieHeader } from "@/lib/auth-utils.server";
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -50,7 +50,7 @@ export const Route = createFileRoute("/api/auth/signin")({
               status: 200,
               headers: {
                 "Content-Type": "application/json",
-                "Set-Cookie": `auth_token=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`,
+                "Set-Cookie": getSessionCookieHeader(token),
               },
             }
           );
