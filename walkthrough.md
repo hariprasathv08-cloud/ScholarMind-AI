@@ -138,8 +138,15 @@ To deploy the application to Render:
 * **Fix**:
   1. Created a `getRequestOrigin` utility that checks `x-forwarded-host` and `x-forwarded-proto` headers before falling back to the standard URL host.
   2. Updated the origin construction in [`google.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/routes/api/auth/google.ts) and [`callback.ts`](file:///C:/Users/harip/OneDrive/Documents/learn-spark-11-main/learn-spark-11-main/src/routes/api/auth/google/callback.ts) to use this utility.
-* **Result**: Google login automatically detects the public domain name (e.g. `https://scholarmind-ai.onrender.com`) and redirects seamlessly without any OAuth configuration mismatch.
+* **Result**: Google login automatically detects the public domain name (e.g. `https://scholarmind-ai.onrender.com`) and redirects seamlessly without any OAuth configuration mismatch.### Client-Side Bundle Isolation & Dynamic Node.js Imports
+* **Problem**: In TanStack Start, the Vite bundler compiles routes and functions for both the client and server. Static top-level imports of Node.js modules (like `pg` and `node:sqlite` in `db.ts` or `jsonwebtoken` and `bcryptjs` in `auth-utils.server.ts`) were being bundled into the client-side JavaScript assets. When browsers loaded the landing or auth page, they failed during initialization with `ReferenceError: Buffer is not defined` or module resolution failures, crashing the application.
+* **Fix**:
+  1. Converted `src/lib/auth-utils.server.ts` to asynchronously import `bcryptjs` and `jsonwebtoken` dynamically inside their respective functions. Updated the application endpoints (like `signin.ts`, `signup.ts`, `callback.ts`, `upload.ts`, `chat.ts`, and `me.ts`) to await the token and password validation calls.
+  2. Restructured `src/lib/db.ts` to dynamically and lazily import `pg`, `node:sqlite`, and `node:path` inside async functions, removing all static top-level Node.js modules from the code.
+  3. Removed the top-level database initialization side-effect (`initDb()`) from `db.ts` to trigger it lazily on the first database query.
+* **Result**: The compiled client assets (e.g. `index-ChmICPzN.js`) have **zero** references to `Buffer` or Node.js server modules, resolving the browser layout crashes.
 
-
-
-
+### Render Node.js Version Provisioning
+* **Problem**: Render defaults to Node.js version 20 if unspecified. In Node versions older than `22.5.0`, the built-in `node:sqlite` module does not exist, causing server startup crashes when trying to load the SQLite fallback database.
+* **Fix**: Added an `"engines": { "node": ">=22.5.0" }` specification to `package.json` to force Render to provision Node.js 22+ for the runtime environment.
+* **Result**: Render builds and runs the application in a modern Node environment where the `node:sqlite` module is fully supported.
